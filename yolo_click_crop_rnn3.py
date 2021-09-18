@@ -204,6 +204,7 @@ while True:
 #time.sleep(1)    # Pause 5.5 seconds
 #print("something")
 
+# First Action Click to crop!
 #region crop to nearest bounding box 
 if len(refPt) >= 2:
 	roi = clone[refPt[0][1]:refPt[1][1], refPt[0][0]:refPt[1][0]]
@@ -237,7 +238,7 @@ if len(refPt) >= 2:
 	roi = clone[ret[0][1]:ret[1][1], ret[0][0]:ret[1][0]]
 #endregion
 
-
+cv2.imwrite("CroppedImage.png", roi)
 markers = []
 stop    = 0
 cv2.namedWindow("dot")
@@ -251,142 +252,142 @@ while True:
 		break
 
 print(markers)
- 
+
 
 # close all open windows
 # cv2.destroyAllWindows()
+run_rnn=0
+if run_rnn==1:
+	#region  Poly RNN Inference
+
+	from PIL import Image
+	im = Image.open('CroppedImage.png')
+	width, height = im.size
+	print(width, height)
+	newsize = (224, 224)
+	im1 = im.resize(newsize)
+	im1 = im1.save("image_resize.png")
+
+	##
+	#External PATHS
+	PolyRNN_metagraph='./polyrnn/models/poly/polygonplusplus.ckpt.meta'
+	PolyRNN_checkpoint='./polyrnn/models/poly/polygonplusplus.ckpt'
+	EvalNet_checkpoint='./polyrnn/models/evalnet/evalnet.ckpt'
+	GGNN_metagraph='./polyrnn/models/ggnn/ggnn.ckpt.meta'
+	GGNN_checkpoint='./polyrnn/models/ggnn/ggnn.ckpt'
+	#Const
+	_BATCH_SIZE=1
+	_FIRST_TOP_K = 6
+
+	# Creating the graphs
+	evalGraph = tf.Graph()
+	polyGraph = tf.Graph()
+	ggnnGraph = tf.Graph()
+	#Initializing and restoring the evaluator net.
+	with evalGraph.as_default():
+		with tf.variable_scope("discriminator_network"):
+			evaluator = EvalNet(_BATCH_SIZE)
+			evaluator.build_graph()
+		saver = tf.train.Saver()
+
+		# Start session
+		evalSess = tf.Session(config=tf.ConfigProto(
+			allow_soft_placement=True
+		), graph=evalGraph)
+		saver.restore(evalSess, EvalNet_checkpoint)
+
+	#Initializing and restoring PolyRNN++
+	model = PolygonModel(PolyRNN_metagraph, polyGraph)
+	model.register_eval_fn(lambda input_: evaluator.do_test(evalSess, input_))
+	polySess = tf.Session(config=tf.ConfigProto(
+		allow_soft_placement=True
+	), graph=polyGraph)
+	model.saver.restore(polySess, PolyRNN_checkpoint)
 
 
-#region  Poly RNN Inference
+	#Initializing and restoring GGNN
+	ggnnGraph = tf.Graph()
+	ggnnModel = GGNNPolygonModel(GGNN_metagraph, ggnnGraph)
+	ggnnSess = tf.Session(config=tf.ConfigProto(
+		allow_soft_placement=True
+	), graph=ggnnGraph)
 
-from PIL import Image
-im = Image.open('CroppedImage.png')
-width, height = im.size
-print(width, height)
-newsize = (224, 224)
-im1 = im.resize(newsize)
-im1 = im1.save("image_resize.png")
+	ggnnModel.saver.restore(ggnnSess,GGNN_checkpoint)
 
-##
-#External PATHS
-PolyRNN_metagraph='./polyrnn/models/poly/polygonplusplus.ckpt.meta'
-PolyRNN_checkpoint='./polyrnn/models/poly/polygonplusplus.ckpt'
-EvalNet_checkpoint='./polyrnn/models/evalnet/evalnet.ckpt'
-GGNN_metagraph='./polyrnn/models/ggnn/ggnn.ckpt.meta'
-GGNN_checkpoint='./polyrnn/models/ggnn/ggnn.ckpt'
-#Const
-_BATCH_SIZE=1
-_FIRST_TOP_K = 6
+	#INPUT IMG CROP (224x224x3) -> object should be centered
+	crop_path='image_resize.png'
 
-# Creating the graphs
-evalGraph = tf.Graph()
-polyGraph = tf.Graph()
-ggnnGraph = tf.Graph()
-#Initializing and restoring the evaluator net.
-with evalGraph.as_default():
-    with tf.variable_scope("discriminator_network"):
-        evaluator = EvalNet(_BATCH_SIZE)
-        evaluator.build_graph()
-    saver = tf.train.Saver()
+	#Testing
+	image_np = io.imread(crop_path)
+	image_np = image_np[:,:,:3]
+	image_np = np.expand_dims(image_np, axis=0)
+	preds = [model.do_test(polySess, image_np, top_k) for top_k in range(_FIRST_TOP_K)]
 
-    # Start session
-    evalSess = tf.Session(config=tf.ConfigProto(
-        allow_soft_placement=True
-    ), graph=evalGraph)
-    saver.restore(evalSess, EvalNet_checkpoint)
+	# sort predictions based on the eval score to pick the best.
+	preds = sorted(preds, key=lambda x: x['scores'][0], reverse=True)
+	#endregion
 
-#Initializing and restoring PolyRNN++
-model = PolygonModel(PolyRNN_metagraph, polyGraph)
-model.register_eval_fn(lambda input_: evaluator.do_test(evalSess, input_))
-polySess = tf.Session(config=tf.ConfigProto(
-    allow_soft_placement=True
-), graph=polyGraph)
-model.saver.restore(polySess, PolyRNN_checkpoint)
+	#Visualizing TOP_K and scores
+	import matplotlib.pyplot as plt
+	fig, axes = plt.subplots(2,3)
+	axes=np.array(axes).flatten()
+	[vis_polys(axes[i], image_np[0], np.array(pred['polys'][0]), title='score=%.2f' % pred['scores'][0]) for i,pred in enumerate(preds)]
+	plt.draw()
+	plt.pause(10) # pause how many seconds
+	plt.close()
 
+	#Let's run GGNN now on the bestPoly
+	bestPoly = preds[0]['polys'][0]
+	feature_indexs, poly, mask = utils.preprocess_ggnn_input(bestPoly)
+	preds_gnn = ggnnModel.do_test(ggnnSess, image_np, feature_indexs, poly, mask)
+	refinedPoly=preds_gnn['polys_ggnn']
 
-#Initializing and restoring GGNN
-ggnnGraph = tf.Graph()
-ggnnModel = GGNNPolygonModel(GGNN_metagraph, ggnnGraph)
-ggnnSess = tf.Session(config=tf.ConfigProto(
-    allow_soft_placement=True
-), graph=ggnnGraph)
+	#print(preds)
+	#Visualize the final prediction
+	#fig, ax = plt.subplots(1,1)
+	#vis_polys(ax,image_np[0],refinedPoly[0], title='PolygonRNN++')
+	#plt.show()
 
-ggnnModel.saver.restore(ggnnSess,GGNN_checkpoint)
+	image =image_np[0]
+	rnn_markers =  refinedPoly[0]
 
-#INPUT IMG CROP (224x224x3) -> object should be centered
-crop_path='image_resize.png'
+	h, w = image.shape[:2]
+	rnn_markers[:, 0] = np.round(rnn_markers[:, 0] * w,0)
+	rnn_markers[:, 1] = np.round(rnn_markers[:, 1] * h,0)
+	rnn_markers = rnn_markers.tolist()
+	rnn_markers = [[int(x) for x in sublist] for sublist in rnn_markers]
+	print(rnn_markers)
+	print(image)
+	#print(type(rnn_markers))
+	#print(rnn_markers.shape)
 
-#Testing
-image_np = io.imread(crop_path)
-image_np = image_np[:,:,:3]
-image_np = np.expand_dims(image_np, axis=0)
-preds = [model.do_test(polySess, image_np, top_k) for top_k in range(_FIRST_TOP_K)]
-
-# sort predictions based on the eval score to pick the best.
-preds = sorted(preds, key=lambda x: x['scores'][0], reverse=True)
-#endregion
-
-#Visualizing TOP_K and scores
-import matplotlib.pyplot as plt
-fig, axes = plt.subplots(2,3)
-axes=np.array(axes).flatten()
-[vis_polys(axes[i], image_np[0], np.array(pred['polys'][0]), title='score=%.2f' % pred['scores'][0]) for i,pred in enumerate(preds)]
-plt.draw()
-plt.pause(10) # pause how many seconds
-plt.close()
-
-#Let's run GGNN now on the bestPoly
-bestPoly = preds[0]['polys'][0]
-feature_indexs, poly, mask = utils.preprocess_ggnn_input(bestPoly)
-preds_gnn = ggnnModel.do_test(ggnnSess, image_np, feature_indexs, poly, mask)
-refinedPoly=preds_gnn['polys_ggnn']
-
-#print(preds)
-#Visualize the final prediction
-#fig, ax = plt.subplots(1,1)
-#vis_polys(ax,image_np[0],refinedPoly[0], title='PolygonRNN++')
-#plt.show()
-
-image =image_np[0]
-rnn_markers =  refinedPoly[0]
-
-h, w = image.shape[:2]
-rnn_markers[:, 0] = np.round(rnn_markers[:, 0] * w,0)
-rnn_markers[:, 1] = np.round(rnn_markers[:, 1] * h,0)
-rnn_markers = rnn_markers.tolist()
-rnn_markers = [[int(x) for x in sublist] for sublist in rnn_markers]
-print(rnn_markers)
-print(image)
-#print(type(rnn_markers))
-#print(rnn_markers.shape)
-
-count=0
-cv2.namedWindow("RNN")
-cv2.setMouseCallback("RNN", counter)
+	count=0
+	cv2.namedWindow("RNN")
+	cv2.setMouseCallback("RNN", counter)
 
 
 
 
-while True:
-	# display the image and wait for a keypress
-	cv2.imshow("RNN", roi)
-	isClosed = False
-	thickness = 2
-	color = (0, 255, 0)
-	cv2.polylines(roi,[np.array(rnn_markers, dtype=np.int32)],isClosed, color,thickness)
-	for point in rnn_markers:
-		cv2.circle(roi,tuple(point),1,(0,0,255))
+	while True:
+		# display the image and wait for a keypress
+		cv2.imshow("RNN", roi)
+		isClosed = False
+		thickness = 2
+		color = (0, 255, 0)
+		cv2.polylines(roi,[np.array(rnn_markers, dtype=np.int32)],isClosed, color,thickness)
+		for point in rnn_markers:
+			cv2.circle(roi,tuple(point),1,(0,0,255))
 
-	key = cv2.waitKey(1) & 0xFF
-    #Double Click Break
+		key = cv2.waitKey(1) & 0xFF
+		#Double Click Break
 
-	if(count>=2):
-		cv2.waitKey(1)
-		cv2.destroyWindow("RNN")
-		break
- 
+		if(count>=2):
+			cv2.waitKey(1)
+			cv2.destroyWindow("RNN")
+			break
+	
 
-## C:/Users/salmansaeed.khan/.conda/envs/PolyRNN/python.exe d:/Personal-GIT/mlpractise/ComputerVision/Yolo/yolo_click_crop_rnn3.py --image image_0.jpg --yolo yolo-coco
+	## C:/Users/salmansaeed.khan/.conda/envs/PolyRNN/python.exe d:/Personal-GIT/mlpractise/ComputerVision/Yolo/yolo_click_crop_rnn3.py --image image_0.jpg --yolo yolo-coco
 
 
 

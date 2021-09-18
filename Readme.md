@@ -1,5 +1,10 @@
+# Smart Semi-automatic Annotation
+
+
 Python Version - 3.6
 cv2 version 4.5.3 (pip3 install opencv-python)
+
+
 
 How to setup?
 
