@@ -1,2 +1,5 @@
 
 *.weights
+*.gz
+*.pyc
+polyrnn/
