@@ -26,7 +26,7 @@ https://www.geeksforgeeks.org/how-to-setup-anaconda-path-to-environment-variable
    pip install --upgrade pip
 
 4. open-cv installation
-   pip install opencv-python==4.5.3
+   pip install opencv-python==4.5.3.56
 
 
 3. Copy Yolo weights from https://pjreddie.com/media/files/yolov3.weights to yolo-coco Directory
@@ -41,9 +41,8 @@ tar -xvf checkpoints_cityscapes.tar.gz ./polyrnn/models/
 
 
 3. Install all packages as detailed in the requirements.txt
+    pip install tensorflow
     pip install -r requirements.txt
-
-
 3. From terminal call:
     python yolo_click_crop_rnn2.py --image 'Image' --yolo yolo-coco
 
