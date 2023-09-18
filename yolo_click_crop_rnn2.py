@@ -1,9 +1,11 @@
 # import the necessary packages
 
+
 import numpy as np
+
 import argparse
 import time
-import cv2
+import cv2 as cv2
 import os
 from math import hypot
 
@@ -20,22 +22,52 @@ from utils_app import *
 import os
 
 
+## Functions
+#CLICK CROP
+refPt = []
+cropping = False
+def click_and_crop(event, x, y, flags, param):
+	# grab references to the global variables
+	global refPt, cropping
+	# if the left mouse button was clicked, record the starting
+	# (x, y) coordinates and indicate that cropping is being
+	# performed
+	if event == cv2.EVENT_LBUTTONDOWN:
+		refPt = [(x, y)]
+		cropping = True
+	# check to see if the left mouse button was released
+	elif event == cv2.EVENT_LBUTTONUP:
+		# record the ending (x, y) coordinates and indicate that
+		# the cropping operation is finished
+		refPt.append((x, y))
+		cropping = False
+		# draw a rectangle around the region of interest
+		cv2.rectangle(image, refPt[0], refPt[1], (0, 255, 0), 2)
+		cv2.imshow("image", image)
+
+def distance(p1,p2):
+#"""Euclidean distance between two points."""
+	xx1, yy1 = p1
+	xx2, yy2 = p2
+	return hypot(xx2 - xx1, yy2 - yy1)
 
 ## construct the argument parse and parse the arguments
-print('Argument Parser')
-ap = argparse.ArgumentParser()
-ap.add_argument("-i", "--image", required=True,
-	help="path to input image")
-ap.add_argument("-y", "--yolo", required=True,
-	help="base path to YOLO directory")
-ap.add_argument("-c", "--confidence", type=float, default=0.5,
-	help="minimum probability to filter weak detections")
-ap.add_argument("-t", "--threshold", type=float, default=0.3,
-	help="threshold when applying non-maxima suppression")
-args = vars(ap.parse_args())
-
 if False:
+	print('Argument Parser')
+	ap = argparse.ArgumentParser()
+	ap.add_argument("-i", "--image", required=True,
+		help="path to input image")
+	ap.add_argument("-y", "--yolo", required=True,
+		help="base path to YOLO directory")
+	ap.add_argument("-c", "--confidence", type=float, default=0.5,
+		help="minimum probability to filter weak detections")
+	ap.add_argument("-t", "--threshold", type=float, default=0.3,
+		help="threshold when applying non-maxima suppression")
+	args = vars(ap.parse_args())
+
+if True:
 	args = {"yolo":'yolo-coco',"image":'dog.jpg',"confidence":0.5,"threshold":0.5}
+
 
 ## load the COCO class labels our YOLO model was trained on
 labelsPath = os.path.sep.join([args["yolo"], "coco.names"])
@@ -54,8 +86,8 @@ net = cv2.dnn.readNetFromDarknet(configPath, weightsPath)
 # load our input image and grab its spatial dimensions
 image = cv2.imread(args["image"])
 clone = image.copy()
-
 (H, W) = image.shape[:2]
+
 # determine only the *output* layer names that we need from YOLO
 ln = net.getLayerNames()
 ln = [ln[i[0] - 1] for i in net.getUnconnectedOutLayers()]
