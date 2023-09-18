@@ -175,6 +175,7 @@ while True:
 # if there are two reference points, then crop the region of interest from the image and display it
 print("Image Selected")
 
+
 if len(refPt) >= 2:
 	roi = clone[refPt[0][1]:refPt[1][1], refPt[0][0]:refPt[1][0]]
 	x = refPt[0][0]
@@ -217,6 +218,7 @@ cv2.destroyAllWindows()
 print('Poly Rnn')
 
 ## Poly RNN
+
 ##
 from PIL import Image
 im = Image.open('CroppedImage.png')
