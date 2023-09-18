@@ -25,6 +25,7 @@ import skimage.io as io
 #CLICK LOCATION:
 refPt = []
 cropping = False
+
 def click_and_crop(event, x, y, flags, param):
 	# grab references to the global variables
 	global refPt, cropping
@@ -91,6 +92,9 @@ ap.add_argument("-t", "--threshold", type=float, default=0.3,
 	help="threshold when applying non-maxima suppression")
 args = vars(ap.parse_args())
 
+
+### test
+##args = {"yolo":'yolo-coco'}
 # load the COCO class labels our YOLO model was trained on
 labelsPath = os.path.sep.join([args["yolo"], "coco.names"])
 LABELS = open(labelsPath).read().strip().split("\n")

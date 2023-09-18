@@ -8,6 +8,7 @@ from math import hypot
 
 
 import tensorflow as tf
+
 from polyrnn.src.PolygonModel import PolygonModel
 from polyrnn.src.EvalNet import EvalNet
 from polyrnn.src.GGNNPolyModel import GGNNPolygonModel

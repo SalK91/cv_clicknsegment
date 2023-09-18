@@ -1,4 +1,5 @@
 # import the necessary packages
+
 import numpy as np
 import argparse
 import time
@@ -15,43 +16,13 @@ from polyrnn.src.GGNNPolyModel import GGNNPolygonModel
 import utils
 from poly_utils import vis_polys
 import skimage.io as io
-
+from utils_app import *
 import os
-os.system("python yourfile.py")
 
 
-## FUNCTIONS
 
-#CLICK CROP
-refPt = []
-cropping = False
-def click_and_crop(event, x, y, flags, param):
-	# grab references to the global variables
-	global refPt, cropping
-	# if the left mouse button was clicked, record the starting
-	# (x, y) coordinates and indicate that cropping is being
-	# performed
-	if event == cv2.EVENT_LBUTTONDOWN:
-		refPt = [(x, y)]
-		cropping = True
-	# check to see if the left mouse button was released
-	elif event == cv2.EVENT_LBUTTONUP:
-		# record the ending (x, y) coordinates and indicate that
-		# the cropping operation is finished
-		refPt.append((x, y))
-		cropping = False
-		# draw a rectangle around the region of interest
-		cv2.rectangle(image, refPt[0], refPt[1], (0, 255, 0), 2)
-		cv2.imshow("image", image)
-
-def distance(p1,p2):
-#"""Euclidean distance between two points."""
-	xx1, yy1 = p1
-	xx2, yy2 = p2
-	return hypot(xx2 - xx1, yy2 - yy1)
-##################################################################################################################
-
-# construct the argument parse and parse the arguments
+## construct the argument parse and parse the arguments
+print('Argument Parser')
 ap = argparse.ArgumentParser()
 ap.add_argument("-i", "--image", required=True,
 	help="path to input image")
@@ -63,7 +34,10 @@ ap.add_argument("-t", "--threshold", type=float, default=0.3,
 	help="threshold when applying non-maxima suppression")
 args = vars(ap.parse_args())
 
-# load the COCO class labels our YOLO model was trained on
+if False:
+	args = {"yolo":'yolo-coco',"image":'dog.jpg',"confidence":0.5,"threshold":0.5}
+
+## load the COCO class labels our YOLO model was trained on
 labelsPath = os.path.sep.join([args["yolo"], "coco.names"])
 LABELS = open(labelsPath).read().strip().split("\n")
 # initialize a list of colors to represent each possible class label
@@ -134,8 +108,7 @@ for output in layerOutputs:
 			classIDs.append(classID)
 
 
-# apply non-maxima suppression to suppress weak, overlapping bounding
-# boxes
+# apply non-maxima suppression to suppress weak, overlapping bounding boxes
 idxs = cv2.dnn.NMSBoxes(boxes, confidences, args["confidence"],args["threshold"])
 
 
@@ -167,8 +140,8 @@ while True:
 		break
 
 
-# if there are two reference points, then crop the region of interest
-# from the image and display it
+# if there are two reference points, then crop the region of interest from the image and display it
+print("Image Selected")
 
 if len(refPt) >= 2:
 	roi = clone[refPt[0][1]:refPt[1][1], refPt[0][0]:refPt[1][0]]
@@ -209,6 +182,7 @@ if len(refPt) >= 2:
 # close all open windows
 cv2.destroyAllWindows()
 
+print('Poly Rnn')
 
 ## Poly RNN
 ##
