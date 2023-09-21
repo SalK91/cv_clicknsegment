@@ -16,6 +16,7 @@ from utils_app import *
 from PIL import Image
 import matplotlib.pyplot as plt
 
+
 # Image To Segment
 im = Image.open('CroppedImage.png')
 width, height = im.size
