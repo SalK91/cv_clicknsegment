@@ -100,3 +100,5 @@ refinedPoly = preds_gnn['polys_ggnn']
 fig, ax = plt.subplots(1, 1)
 vis_polys(ax, image_np[0], refinedPoly[0], title='PolygonRNN++')
 plt.show()
+
+# & C:/Users/salmank/anaconda3/envs/py36rnn/python.exe c:/Users/salmank/Documents/cv_clicknsegment/polyrnn_test.py
