@@ -6,6 +6,8 @@ import numpy as np
 import os as os
 import tensorflow as tf
 
+from math import hypot
+
 
 ## Functions
 #CLICK CROP
@@ -13,7 +15,7 @@ refPt = []
 cropping = False
 def click_and_crop(event, x, y, flags, param):
 	# grab references to the global variables
-	global refPt, cropping
+	global refPt, cropping, image
 	# if the left mouse button was clicked, record the starting
 	# (x, y) coordinates and indicate that cropping is being
 	# performed
